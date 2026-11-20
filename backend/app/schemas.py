@@ -363,7 +363,11 @@ class BehaviorHeatmapEntry(BaseModel):
 
 # ========== 数据链路产物 ==========
 class CleanseResult(BaseModel):
-    """清洗结果产物。"""
+    """清洗结果产物。
+
+    一次清洗执行产生一个不可变的批次快照：统计数字、逐条记录状态、
+    规则版本和批次号都来自同一份快照，下游聚合只读取其中一个批次。
+    """
 
     rule_id: str
     event_id: str
@@ -374,6 +378,34 @@ class CleanseResult(BaseModel):
     output_table: str = ""
     snapshot_path: str = ""
 
+    # 批次与版本：聚合结果会记录实际消费的 batch_id / rule_version。
+    batch_id: str = ""
+    batch_seq: int = 0
+    rule_version: str = ""
+    cleanse_version: str = ""
+    generated_at: float = 0.0
+
+    # 清洗明细统计：valid + invalid + deduped == total_records。
+    quarantined_records: int = 0
+    discarded_records: int = 0
+    flagged_records: int = 0
+    usable_records: int = 0
+    available_records: int = 0
+    excluded_records: int = 0
+
+    # 逐条记录及按状态拆分的编号，用于聚合逐桶回查。
+    valid_record_ids: list[str] = Field(default_factory=list)
+    usable_record_ids: list[str] = Field(default_factory=list)
+    quarantined_record_ids: list[str] = Field(default_factory=list)
+    discarded_record_ids: list[str] = Field(default_factory=list)
+    deduped_record_ids: list[str] = Field(default_factory=list)
+    records: list[dict[str, Any]] = Field(default_factory=list)
+    cleansed_records: list[dict[str, Any]] = Field(default_factory=list)
+    # 与 snapshot 同时生成的汇总与来源编号，保证统计和数据同源。
+    stats: dict[str, int] = Field(default_factory=dict)
+    source_record_ids: list[str] = Field(default_factory=list)
+    available_record_ids: list[str] = Field(default_factory=list)
+
 
 class AggResult(BaseModel):
     """聚合结果产物。"""
@@ -383,8 +415,26 @@ class AggResult(BaseModel):
     agg_dimensions: list[str]
     time_grain: str
     result_rows: list[dict[str, Any]] = Field(default_factory=list)
+    # total_count 是进入聚合的有效记录数；result_row_count 是时间桶结果行数。
     total_count: int = 0
     output_table: str = ""
+
+    # 本结果实际消费的清洗批次与规则版本（结果与批次快照强绑定）。
+    source_batch_id: str = ""
+    batch_id: str = ""
+    cleanse_batch_id: str = ""
+    source_cleanse_batch: str = ""
+    source_cleanse_rule_id: str = ""
+    cleanse_rule_id: str = ""
+    source_cleanse_version: str = ""
+    cleanse_rule_version: str = ""
+    generated_at: float = 0.0
+
+    source_record_count: int = 0
+    source_record_ids: list[str] = Field(default_factory=list)
+    result_row_count: int = 0
+    row_count: int = 0
+    total_amount: float = 0.0
 
 
 class TagComputeResult(BaseModel):

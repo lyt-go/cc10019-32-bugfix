@@ -97,6 +97,20 @@ class Store:
             self._artifacts[artifact_type] = {}
         self._artifacts[artifact_type][artifact_id] = data
 
+    def set_artifacts(self, items: list[tuple[str, str, dict[str, Any]]]) -> None:
+        """一次性写入多份产物。
+
+        先全部暂存再统一替换，避免“统计已经写进去、来源记录还是旧的”这类
+        半提交状态；写入过程中失败时原有产物保持不变。
+        """
+        pending: dict[str, dict[str, Any]] = {}
+        for artifact_type, artifact_id, data in items:
+            pending.setdefault(artifact_type, {})[artifact_id] = data
+        for artifact_type, entries in pending.items():
+            if artifact_type not in self._artifacts:
+                self._artifacts[artifact_type] = {}
+            self._artifacts[artifact_type].update(entries)
+
     def get_artifact(self, artifact_type: str, artifact_id: str) -> dict[str, Any] | None:
         """获取跨模块数据产物。"""
         return self._artifacts.get(artifact_type, {}).get(artifact_id)

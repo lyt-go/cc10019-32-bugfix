@@ -18,13 +18,16 @@ def generate_heatmap(config_id: str) -> dict[str, Any]:
     agg_grain = config["agg_grain"]
     time_range = config["time_range"]
 
-    # 获取事件聚合产物作为输入
+    # 获取事件聚合产物作为输入：优先使用该事件最新发布、且与清洗批次一致的结果。
     agg_artifacts = store.list_artifacts("event_aggregate")
     related_agg = None
     for agg in agg_artifacts:
-        if agg.get("event_id") == event_id:
+        if agg.get("event_id") != event_id:
+            continue
+        if related_agg is None or float(agg.get("generated_at", 0) or 0) >= float(
+            related_agg.get("generated_at", 0) or 0
+        ):
             related_agg = agg
-            break
 
     # 生成热力数据
     heat_data: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -73,6 +76,10 @@ def generate_heatmap(config_id: str) -> dict[str, Any]:
             default=0,
         ),
         "source_aggregate": related_agg.get("config_id") if related_agg else None,
+        "source_batch_id": related_agg.get("source_batch_id") if related_agg else None,
+        "source_cleanse_version": (
+            related_agg.get("source_cleanse_version") if related_agg else None
+        ),
         "output_image": config.get("output_image", ""),
     }
 
